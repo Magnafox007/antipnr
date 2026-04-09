@@ -6,6 +6,9 @@ import {
   ScrollView,
   Modal,
   SafeAreaView,
+  Linking,
+  ActivityIndicator,
+  Platform,
 } from 'react-native';
 import { useState } from 'react';
 import {
@@ -21,6 +24,8 @@ import {
   ChevronRight,
   TrendingDown,
 } from 'lucide-react-native';
+import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/context/AuthContext';
 
 interface SubscriptionScreenProps {
   visible: boolean;
@@ -63,8 +68,57 @@ export default function SubscriptionScreen({
   missedEarnings,
 }: SubscriptionScreenProps) {
   const [billing, setBilling] = useState<'monthly' | 'annual'>('annual');
+  const [loading, setLoading] = useState(false);
+  const [checkoutError, setCheckoutError] = useState<string | null>(null);
+  const { user } = useAuth();
   const isPro = currentPlan === 'pro';
   const isAnnual = billing === 'annual';
+
+  const handleSubscribe = async () => {
+    setCheckoutError(null);
+    setLoading(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+
+      const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
+      const response = await fetch(
+        `${supabaseUrl}/functions/v1/create-checkout-session`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            billing,
+            userId: user?.id,
+            userEmail: user?.email,
+          }),
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok || data.error) {
+        setCheckoutError(data.error || 'Erro ao iniciar pagamento. Tente novamente.');
+        return;
+      }
+
+      if (data.url) {
+        if (Platform.OS === 'web') {
+          window.location.href = data.url;
+        } else {
+          await Linking.openURL(data.url);
+        }
+        onClose();
+      }
+    } catch {
+      setCheckoutError('Erro ao conectar com o servidor. Tente novamente.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const displayPrice = isAnnual ? ANNUAL_PRICE : MONTHLY_PRICE;
   const displayPeriod = isAnnual ? '/ano' : '/mes';
@@ -207,13 +261,25 @@ export default function SubscriptionScreen({
               })}
             </View>
 
+            {checkoutError && (
+              <Text style={styles.errorText}>{checkoutError}</Text>
+            )}
+
             {!isPro && (
-              <TouchableOpacity style={styles.proCtaButton} activeOpacity={0.85}>
-                <Zap size={18} color="#ffffff" />
+              <TouchableOpacity
+                style={[styles.proCtaButton, loading && styles.proCtaButtonDisabled]}
+                activeOpacity={0.85}
+                onPress={handleSubscribe}
+                disabled={loading}>
+                {loading ? (
+                  <ActivityIndicator size="small" color="#ffffff" />
+                ) : (
+                  <Zap size={18} color="#ffffff" />
+                )}
                 <Text style={styles.proCtaText}>
-                  Assinar por R$ {displayPrice.toFixed(2).replace('.', ',')}{displayPeriod}
+                  {loading ? 'Redirecionando...' : `Assinar por R$ ${displayPrice.toFixed(2).replace('.', ',')}${displayPeriod}`}
                 </Text>
-                <ChevronRight size={18} color="#ffffff" />
+                {!loading && <ChevronRight size={18} color="#ffffff" />}
               </TouchableOpacity>
             )}
 
@@ -650,5 +716,15 @@ const styles = StyleSheet.create({
     color: '#475569',
     textAlign: 'center',
     lineHeight: 18,
+  },
+  errorText: {
+    fontSize: 13,
+    color: '#ef4444',
+    textAlign: 'center',
+    marginBottom: 12,
+    lineHeight: 18,
+  },
+  proCtaButtonDisabled: {
+    opacity: 0.7,
   },
 });
