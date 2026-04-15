@@ -208,9 +208,7 @@ export default function RouteUploadScreen({ onAnalysisComplete }: RouteUploadScr
               </Text>
               <TextInput
                 style={styles.textArea}
-                placeholder={
-                  'Rua Silva 120, São Paulo\nAv Brasil 450, São Paulo\nRua das Flores 22, São Paulo\nRua Central 800, São Paulo'
-                }
+                placeholder={'Digite os endereços aqui, um por linha...'}
                 placeholderTextColor="#9CA3AF"
                 multiline
                 numberOfLines={12}
