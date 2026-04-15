@@ -156,7 +156,7 @@ export default function SubscriptionScreen({
             </Text>
           </View>
 
-          {missedEarnings !== undefined && missedEarnings > 0 && (
+          {missedEarnings !== undefined && missedEarnings > 0 ? (
             <View style={styles.warningBanner}>
               <TrendingDown size={20} color="#f59e0b" />
               <View style={styles.warningTextBox}>
@@ -167,9 +167,7 @@ export default function SubscriptionScreen({
                 </Text>
               </View>
             </View>
-          )}
-
-          {missedEarnings === undefined && (
+          ) : (
             <View style={styles.warningBanner}>
               <TrendingDown size={20} color="#f59e0b" />
               <View style={styles.warningTextBox}>

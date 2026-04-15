@@ -12,8 +12,8 @@ import {
   Zap,
 } from 'lucide-react-native';
 import { useAuth } from '@/context/AuthContext';
-import { router } from 'expo-router';
-import { useState, useEffect } from 'react';
+import { router, useFocusEffect } from 'expo-router';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import SubscriptionScreen from '@/components/SubscriptionScreen';
 
@@ -28,17 +28,25 @@ export default function ProfileScreen() {
     ? new Date(user.created_at).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })
     : '';
 
-  useEffect(() => {
+  const fetchPlan = useCallback(async () => {
     if (!user) return;
-    (async () => {
-      const { data } = await supabase
-        .from('profiles')
-        .select('plan_type')
-        .eq('id', user.id)
-        .maybeSingle();
-      if (data?.plan_type) setPlanType(data.plan_type as 'free' | 'pro');
-    })();
+    const { data } = await supabase
+      .from('profiles')
+      .select('plan_type')
+      .eq('id', user.id)
+      .maybeSingle();
+    if (data?.plan_type) setPlanType(data.plan_type as 'free' | 'pro');
   }, [user]);
+
+  useEffect(() => {
+    fetchPlan();
+  }, [fetchPlan]);
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchPlan();
+    }, [fetchPlan])
+  );
 
   const handleSignOut = () => {
     Alert.alert(

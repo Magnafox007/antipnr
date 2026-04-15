@@ -161,7 +161,7 @@ export async function submitReport(
   const { data: existing } = await supabase
     .from('addresses')
     .select('id')
-    .ilike('normalized_address', addressText.trim().toLowerCase())
+    .ilike('address_text', `%${addressText.trim()}%`)
     .maybeSingle();
 
   if (existing) {

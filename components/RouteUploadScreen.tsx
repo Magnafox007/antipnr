@@ -121,8 +121,8 @@ export default function RouteUploadScreen({ onAnalysisComplete }: RouteUploadScr
     setLoading(true);
 
     try {
-      const { analyzeTextRoute } = await import('../services/routeAnalyzerService');
-      const result = await analyzeTextRoute(textInput);
+      const { analyzeTextRoute: analyzeTextRouteService } = await import('../services/routeAnalyzerService');
+      const result = await analyzeTextRouteService(textInput);
 
       if (result.highRiskAddresses > 0) {
         Alert.alert(
@@ -280,7 +280,7 @@ export default function RouteUploadScreen({ onAnalysisComplete }: RouteUploadScr
             <Text style={styles.selectedFileLabel}>Arquivo selecionado:</Text>
             <Text style={styles.selectedFileName}>{selectedFile.name}</Text>
             <Text style={styles.selectedFileSize}>
-              {(selectedFile.size! / 1024).toFixed(2)} KB
+              {((selectedFile.size ?? 0) / 1024).toFixed(2)} KB
             </Text>
           </View>
         )}
