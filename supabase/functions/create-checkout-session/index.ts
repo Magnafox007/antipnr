@@ -47,7 +47,7 @@ Deno.serve(async (req: Request) => {
           },
         };
 
-    const appUrl = Deno.env.get("APP_URL") || "https://faaljeqbthbhjlhodxof.supabase.co";
+    const appUrl = Deno.env.get("URL_DO_APLICATIVO") || Deno.env.get("APP_URL") || "https://faaljeqbthbhjlhodxof.supabase.co";
 
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ["card"],
