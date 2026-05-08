@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -12,31 +12,81 @@ import {
 } from 'react-native';
 import { router } from 'expo-router';
 import { ShieldAlert, Mail, Lock, Eye, EyeOff } from 'lucide-react-native';
-import { useAuth } from '@/context/AuthContext';
+import { supabase } from '@/lib/supabase';
+
+type UserRole = 'master_admin' | 'admin' | 'premium' | 'user';
+
+function getErrorMessage(errorMsg: string): string {
+  if (errorMsg.includes('Invalid login credentials')) {
+    return 'E-mail ou senha incorretos.';
+  }
+  if (errorMsg.includes('Email not confirmed')) {
+    return 'E-mail ainda nao confirmado.';
+  }
+  if (errorMsg.includes('Too many requests')) {
+    return 'Muitas tentativas. Aguarde alguns minutos.';
+  }
+  return 'Erro ao fazer login. Tente novamente.';
+}
+
+function resolveRedirect(role: UserRole): string {
+  if (role === 'master_admin' || role === 'admin') {
+    return '/admin-secret';
+  }
+  return '/(tabs)';
+}
 
 export default function LoginScreen() {
-  const { signIn } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const handleLogin = async () => {
-    if (!email.trim() || !password.trim()) {
+  const handleLogin = useCallback(async () => {
+    const trimmedEmail = email.trim().toLowerCase();
+    const trimmedPassword = password.trim();
+
+    if (!trimmedEmail || !trimmedPassword) {
       setError('Preencha todos os campos.');
       return;
     }
+
     setError(null);
     setLoading(true);
-    const { error } = await signIn(email.trim(), password);
-    setLoading(false);
-    if (error) {
-      setError('E-mail ou senha incorretos.');
-    } else {
-      router.replace('/(tabs)');
+
+    try {
+      const { data, error: authError } = await supabase.auth.signInWithPassword({
+        email: trimmedEmail,
+        password: trimmedPassword,
+      });
+
+      if (authError || !data.user) {
+        setError(getErrorMessage(authError?.message ?? 'Unknown error'));
+        setLoading(false);
+        return;
+      }
+
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('role, plan_type')
+        .eq('id', data.user.id)
+        .maybeSingle();
+
+      const role: UserRole = profile?.role ?? 'user';
+      const destination = resolveRedirect(role);
+
+      router.replace(destination as any);
+    } catch {
+      setError('Erro de conexao. Verifique sua internet.');
+    } finally {
+      setLoading(false);
     }
-  };
+  }, [email, password]);
+
+  const togglePassword = useCallback(() => {
+    setShowPassword((prev) => !prev);
+  }, []);
 
   return (
     <KeyboardAvoidingView
@@ -50,7 +100,7 @@ export default function LoginScreen() {
             <ShieldAlert size={48} color="#ef4444" />
           </View>
           <Text style={styles.title}>AntiPNR</Text>
-          <Text style={styles.subtitle}>Rede de segurança para entregadores</Text>
+          <Text style={styles.subtitle}>Rede de seguranca para entregadores</Text>
         </View>
 
         <View style={styles.card}>
@@ -75,6 +125,7 @@ export default function LoginScreen() {
                 keyboardType="email-address"
                 autoCapitalize="none"
                 autoComplete="email"
+                editable={!loading}
               />
             </View>
           </View>
@@ -91,10 +142,9 @@ export default function LoginScreen() {
                 onChangeText={setPassword}
                 secureTextEntry={!showPassword}
                 autoComplete="password"
+                editable={!loading}
               />
-              <TouchableOpacity
-                onPress={() => setShowPassword(!showPassword)}
-                style={styles.eyeIcon}>
+              <TouchableOpacity onPress={togglePassword} style={styles.eyeIcon}>
                 {showPassword ? (
                   <EyeOff size={18} color="#6b7280" />
                 ) : (
@@ -123,7 +173,8 @@ export default function LoginScreen() {
 
           <TouchableOpacity
             style={styles.secondaryButton}
-            onPress={() => router.push('/register')}>
+            onPress={() => router.push('/register')}
+            disabled={loading}>
             <Text style={styles.secondaryButtonText}>Criar conta gratuitamente</Text>
           </TouchableOpacity>
         </View>
