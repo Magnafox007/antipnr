@@ -11,7 +11,7 @@ import {
   RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { router } from 'expo-router';
 import {
   ShieldCheck,
@@ -30,6 +30,8 @@ import {
   MapPin,
 } from 'lucide-react-native';
 import { AdminAuthProvider, useAdminAuth } from '@/context/AdminAuthContext';
+import { useAuth } from '@/context/AuthContext';
+import { supabase } from '@/lib/supabase';
 import {
   AdminStats,
   AdminUserProfile,
@@ -386,6 +388,47 @@ function AdminSecretContent() {
 }
 
 export default function AdminSecretRoute() {
+  const { user, loading } = useAuth();
+  const [authorized, setAuthorized] = useState(false);
+  const [checking, setChecking] = useState(true);
+  const checkedRef = useRef(false);
+
+  useEffect(() => {
+    if (loading || checkedRef.current) return;
+
+    if (!user) {
+      router.replace('/login');
+      return;
+    }
+
+    checkedRef.current = true;
+    (async () => {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', user.id)
+        .maybeSingle();
+
+      const role = profile?.role;
+      if (role === 'master_admin' || role === 'admin') {
+        setAuthorized(true);
+      } else {
+        router.replace('/login');
+      }
+      setChecking(false);
+    })();
+  }, [user, loading]);
+
+  if (loading || checking) {
+    return (
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#0f172a' }}>
+        <ActivityIndicator size="large" color="#dc2626" />
+      </View>
+    );
+  }
+
+  if (!authorized) return null;
+
   return (
     <AdminAuthProvider>
       <AdminSecretContent />
